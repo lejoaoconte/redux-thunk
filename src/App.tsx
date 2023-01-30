@@ -1,26 +1,35 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { FormEvent } from "react";
 
-function App() {
+import { connect } from "react-redux";
+
+import { userPropsState, TypedDispatch, UserState } from "./redux/@types";
+
+import { getUser } from "./redux/actions/user";
+
+interface AppProps {
+  user: UserState;
+  dispatch: TypedDispatch;
+}
+
+function AppContainer(props: AppProps) {
+  const { dispatch, user } = props;
+
+  function handleSubmitUser(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const user = e.currentTarget["username"].value;
+    dispatch(getUser(user));
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <h1>{user.name}</h1>
+      <form onSubmit={handleSubmitUser}>
+        <input type="text" name="username" />
+        <button type="submit">Fetch User</button>
+      </form>
     </div>
   );
 }
 
-export default App;
+const mapStateToProps = (state: userPropsState) => state;
+export const App = connect(mapStateToProps)(AppContainer);
