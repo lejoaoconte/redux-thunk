@@ -1,46 +1,211 @@
-# Getting Started with Create React App
+# Redux Thunk
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**redux-thunk** é um middleware redux que pode ser integrado para retornar funções para o redux que pode interagir com o dispatch de forma assíncrona, de forma bem simples o redux-thunk permite que o dispatch possa fazer uma chamada em uma função para fazer requisição, por exemplo.
 
-## Available Scripts
+Para implementar o mesmo basta seguir os passos simples.
 
-In the project directory, you can run:
+---
 
-### `yarn start`
+Começando com a **implementação** do **index** da pasta `@**types**`. Lembrando que a ultima parte ontem tem o tipo do reducer rootReducer pode ser implementado como está, mas depende da implementação do reducer e do rootReducer.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```tsx
+import { AnyAction } from "redux";
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+import { ThunkDispatch } from "redux-thunk";
 
-### `yarn test`
+import rootReucer from "redux/reducers";
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+export interface UserState {
+  login: string;
+  avatar_url: string;
+  name: string;
+  location: string;
+} // Tipo dos elementos do usuário
 
-### `yarn build`
+export interface userPropsState {
+  user: UserState;
+} // Tipo do usuário que tem o user que tem seus tipos
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+export interface GetUserProps {
+  type: "GET_USER";
+  payload: UserState;
+} // Tipo de props dos users onde temos o tipo get para obter e o payload do tipo UserState
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+// Combina as interfaces de action em um único tipo para uso no reducer
+export type ActionTypes = GetUserProps;
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+// Tipo para state do redux
+export type ReduxState = ReturnType<typeof rootReucer>;
+//Tipo para dispatch do redux
+export type TypedDispatch = ThunkDispatch<ReduxState, any, AnyAction>;
+```
 
-### `yarn eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+Após isso podemos **criar uma action** para obter os dados do usuário.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```tsx
+import { Dispatch } from "redux";
+// Obtem a configuração do axios
+import api from "services/api";
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+import { UserState } from "redux/@types";
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+// Action para obter os dados do usuário
+function getUserAction(user: UserState) {
+  return {
+    type: "GET_USER",
+    payload: user,
+  };
+}
 
-## Learn More
+// Fetch para obter os dados na API.
+export function getUser(name: string) {
+  return (dispatch: Dispatch) => {
+    api
+      .get(`users/${name}`)
+      .then((response) => dispatch(getUserAction(response.data)))
+      .catch((error) => console.error(error));
+  };
+}
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Com isso podemos **criar um reducer** do usuário e o rootReducer para unir todos reducer que iremos usar na nossa aplicação.
+
+```tsx
+import { ActionTypes, UserState } from "../@types";
+
+// Inicializa com dados vazios antes de obter os dados.
+const initialState: UserState = {
+  avatar_url: "",
+  location: "",
+  login: "",
+  name: "",
+};
+
+// Switch para definir qual será a action que irá ser executada e o que irá ser feito no state
+export function user(state = initialState, action: ActionTypes) {
+  switch (action.type) {
+    case "GET_USER":
+      return {
+        ...state,
+        avatar_url: action.payload.avatar_url,
+        location: action.payload.location,
+        name: action.payload.name,
+        login: action.payload.login,
+      };
+    default:
+      return state;
+  }
+}
+```
+
+```tsx
+import { combineReducers } from "redux";
+
+import { user } from "./user";
+
+// Une todos reducers que iremos usar, neste caso só tem um
+const rootReducer = combineReducers({
+  user: user,
+});
+
+export default rootReducer;
+```
+
+---
+
+Por fim, criamos nossa **store** para finalizar todo processo do redux, com isso temos: 
+
+```tsx
+import { AnyAction, Store } from "redux";
+
+import thunk from "redux-thunk";
+
+import { configureStore } from "@reduxjs/toolkit";
+
+import rootReducer from "./reducers";
+
+// Criando store e aplicando o middleware thunk, que pode ser aplicado a parte
+export const store: Store<unknown, AnyAction> = configureStore({
+  reducer: rootReducer,
+  middleware: [thunk],
+});
+```
+
+---
+
+Por fim, implementamos o **provider no index.tsx** e podemos ver a implementação simples no App.tsx
+
+```tsx
+root.render(
+  <Provider store={store}>
+    <App />
+  </Provider>
+);
+```
+
+```tsx
+import React, { FormEvent } from "react";
+
+import { connect } from "react-redux";
+
+import { userPropsState, TypedDispatch, UserState } from "./redux/@types";
+
+import { getUser } from "./redux/actions/user";
+
+interface AppProps {
+  user: UserState;
+  dispatch: TypedDispatch;
+}
+
+// Recebe a prop passada pelo connect
+function AppContainer(props: AppProps) {
+  const { dispatch, user } = props;
+
+  function handleSubmitUser(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const user = e.currentTarget["username"].value;
+    dispatch(getUser(user));
+  }
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <form onSubmit={handleSubmitUser}>
+        <input type="text" name="username" />
+        <button type="submit">Fetch User</button>
+      </form>
+    </div>
+  );
+}
+
+// Função para obter os states gerais
+const mapStateToProps = (state: userPropsState) => state;
+// Conecta no mapa o app container
+export const App = connect(mapStateToProps)(AppContainer);
+```
+
+---
+
+Pontos importantes:
+
+- Configuração simples do axios:
+
+```tsx
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: "https://api.github.com/",
+});
+
+export default api;
+```
+
+- Bibliotecas para instalar:
+
+```bash
+yarn add axios redux redux-thunk @reduxjs/toolkit react-redux 
+```
